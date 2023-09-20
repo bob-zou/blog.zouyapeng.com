@@ -1,0 +1,319 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN,en,default" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K8S学习笔记（二）- K8S集群搭建（v1.18.0） - 书山有路勤为径，学海无涯苦作舟</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="BobZou,"> 
+    <meta name="description" content="环境规划集群类型
+Kubernetes集群大致分为两类：一主多从和多主多从本次搭建主要以学习为主，将使用一主多从的集群类型
+
+
+一主多从：一个Master节点和多台Node节点，搭建简单，但是有单机,"> 
+    <meta name="author" content="Bob Zou"> 
+    <link rel="alternative" href="atom.xml" title="书山有路勤为径，学海无涯苦作舟" type="application/atom+xml"> 
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+<link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">书山有路勤为径，学海无涯苦作舟</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="https://blog.zouyapeng.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">K8S学习笔记（二）- K8S集群搭建（v1.18.0）</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">K8S学习笔记（二）- K8S集群搭建（v1.18.0）</h1>
+        <div class="stuff">
+            <span>三月 06, 2022</span>
+            
+  <ul class="post-tags-list" itemprop="keywords"><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/docker/" rel="tag">docker</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/k8s/" rel="tag">k8s</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/kubernetes/" rel="tag">kubernetes</a></li></ul>
+
+
+        </div>
+        <div class="content markdown">
+            <h1 id="环境规划"><a href="#环境规划" class="headerlink" title="环境规划"></a>环境规划</h1><h2 id="集群类型"><a href="#集群类型" class="headerlink" title="集群类型"></a>集群类型</h2><blockquote>
+<p>Kubernetes集群大致分为两类：一主多从和多主多从<br>本次搭建主要以学习为主，将使用一主多从的集群类型<br><img src="1.png" alt="1"></p>
+</blockquote>
+<ul>
+<li>一主多从：一个Master节点和多台Node节点，搭建简单，但是有单机故障风险，适合用于测试环境。</li>
+<li>多主多从：多台Master和多台Node节点，搭建麻烦，安全性高，适合用于生产环境。</li>
+</ul>
+<h2 id="安装方式"><a href="#安装方式" class="headerlink" title="安装方式"></a>安装方式</h2><blockquote>
+<p>kubernetes有多种部署方式，目前主流的方式有kubeadm、minikube、二进制包<br>我们需要安装kubernetes的集群环境，但是又不想过于麻烦，所以选择kubeadm方式</p>
+</blockquote>
+<ul>
+<li>minikube：一个用于快速搭建单节点的kubernetes工具</li>
+<li>kubeadm：一个用于快速搭建kubernetes集群的工具</li>
+<li>二进制包：从官网上下载每个组件的二进制包，依次去安装，此方式对于理解kubernetes组件更加有效</li>
+</ul>
+<h2 id="主机规划"><a href="#主机规划" class="headerlink" title="主机规划"></a>主机规划</h2><table>
+<thead>
+<tr>
+<th>节点类型</th>
+<th>IP</th>
+<th>OS</th>
+<th>配置</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Master</td>
+<td>192.168.200.100</td>
+<td>CentOS 7.9</td>
+<td>2C2G + 50G</td>
+</tr>
+<tr>
+<td>Node 1</td>
+<td>192.168.200.101</td>
+<td>CentOS 7.9</td>
+<td>2C2G + 50G</td>
+</tr>
+<tr>
+<td>Node 2</td>
+<td>192.168.200.102</td>
+<td>CentOS 7.9</td>
+<td>2C2G + 50G</td>
+</tr>
+</tbody></table>
+<h1 id="环境搭建"><a href="#环境搭建" class="headerlink" title="环境搭建"></a>环境搭建</h1><blockquote>
+<p>本次环境搭建需要三台CentOS服务器（一主二从），然后在每台服务器中分别安装Docker（18.06.3）、kubeadm（1.18.0）、kubectl（1.18.0）和kubelet（1.18.0）。<br>没有特殊说明，就是三台机器都需要执行。<br>本文使用虚拟机进行环境搭建，虚拟机安装配置，请自行学习完成。</p>
+</blockquote>
+<h2 id="环境初始化"><a href="#环境初始化" class="headerlink" title="环境初始化"></a>环境初始化</h2><h3 id="确定操作系统版本"><a href="#确定操作系统版本" class="headerlink" title="确定操作系统版本"></a>确定操作系统版本</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">cat /etc/redhat-release</span><br></pre></td></tr></table></figure>
+
+<h3 id="关闭防火墙"><a href="#关闭防火墙" class="headerlink" title="关闭防火墙"></a>关闭防火墙</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl stop firewalld</span><br><span class="line">systemctl disable firewalld</span><br></pre></td></tr></table></figure>
+
+<h3 id="关闭selinux"><a href="#关闭selinux" class="headerlink" title="关闭selinux"></a>关闭selinux</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看状态</span></span><br><span class="line">getenforce</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">临时关闭，重启后失效</span></span><br><span class="line">setenforce 0</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">重启后生效</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">修改 SELINUX 为 disabled</span></span><br><span class="line">vim /etc/selinux/config</span><br></pre></td></tr></table></figure>
+
+<h3 id="设置主机名"><a href="#设置主机名" class="headerlink" title="设置主机名"></a>设置主机名</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">192.168.200.100</span></span><br><span class="line">hostnamectl set-hostname k8s-master</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">192.168.200.101</span></span><br><span class="line">hostnamectl set-hostname k8s-node1</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">192.168.200.102</span></span><br><span class="line">hostnamectl set-hostname k8s-node2</span><br></pre></td></tr></table></figure>
+
+<h3 id="修改主机名解析"><a href="#修改主机名解析" class="headerlink" title="修改主机名解析"></a>修改主机名解析</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">cat &gt;&gt; /etc/hosts &lt;&lt; EOF</span><br><span class="line">192.168.200.100 k8s-master</span><br><span class="line">192.168.200.101 k8s-node1</span><br><span class="line">192.168.200.102 k8s-node2</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+
+<h3 id="时间同步"><a href="#时间同步" class="headerlink" title="时间同步"></a>时间同步</h3><blockquote>
+<p>kubernetes要求集群中的节点时间必须精确一致，所以在每个节点上添加时间同步</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">yum install ntpdate -y</span><br><span class="line">ntpdate ntp.aliyun.com</span><br></pre></td></tr></table></figure>
+
+<h3 id="关闭swap分区"><a href="#关闭swap分区" class="headerlink" title="关闭swap分区"></a>关闭swap分区</h3><blockquote>
+<p>swap分区会在系统资源不够的情况下，将磁盘作为内存使用，然而磁盘的读写性能远不及内存<br>所以k8s是要求每个节点都禁用swap分区</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">临时关闭</span></span><br><span class="line">swapoff -a</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">永久关闭</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">注释掉swap分区即可</span></span><br><span class="line">vim /etc/fstab</span><br></pre></td></tr></table></figure>
+
+<h3 id="将桥接的IPv4流量传递到iptables的链"><a href="#将桥接的IPv4流量传递到iptables的链" class="headerlink" title="将桥接的IPv4流量传递到iptables的链"></a>将桥接的IPv4流量传递到iptables的链</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">cat &gt; /etc/sysctl.d/kubernetes.conf &lt;&lt; EOF</span><br><span class="line">net.bridge.bridge-nf-call-ip6tables = 1</span><br><span class="line">net.bridge.bridge-nf-call-iptables = 1</span><br><span class="line">net.ipv4.ip_forward = 1</span><br><span class="line">vm.swappiness = 0</span><br><span class="line">EOF</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">加载br_netfilter模块</span></span><br><span class="line">modprobe br_netfilter</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看是否加载</span></span><br><span class="line">lsmod | grep br_netfilter</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">生效</span></span><br><span class="line">sysctl -p</span><br></pre></td></tr></table></figure>
+
+<h3 id="开启ipvs"><a href="#开启ipvs" class="headerlink" title="开启ipvs"></a>开启ipvs</h3><blockquote>
+<p>在kubernetes中service有两种代理模型，一种是基于iptables，另一种是基于ipvs的。ipvs的性能要高于iptables的，但是如果要使用它，需要手动载入ipvs模块</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">yum -y install ipset ipvsadm</span><br><span class="line"></span><br><span class="line">cat &gt; /etc/sysconfig/modules/ipvs.modules &lt;&lt;EOF</span><br><span class="line"><span class="meta prompt_">#</span><span class="language-bash">!/bin/bash</span></span><br><span class="line">modprobe -- ip_vs</span><br><span class="line">modprobe -- ip_vs_rr</span><br><span class="line">modprobe -- ip_vs_wrr</span><br><span class="line">modprobe -- ip_vs_sh</span><br><span class="line">modprobe -- nf_conntrack_ipv4</span><br><span class="line">EOF</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">授权、运行、检查是否加载</span></span><br><span class="line">chmod 755 /etc/sysconfig/modules/ipvs.modules</span><br><span class="line">bash /etc/sysconfig/modules/ipvs.modules</span><br><span class="line">lsmod | grep -e ip_vs -e nf_conntrack_ipv4</span><br></pre></td></tr></table></figure>
+
+<h3 id="重启一下三台机器"><a href="#重启一下三台机器" class="headerlink" title="重启一下三台机器"></a>重启一下三台机器</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">reboot</span><br></pre></td></tr></table></figure>
+
+<h2 id="安装docker，kubeadm，kubelet，kubectl"><a href="#安装docker，kubeadm，kubelet，kubectl" class="headerlink" title="安装docker，kubeadm，kubelet，kubectl"></a>安装docker，kubeadm，kubelet，kubectl</h2><h3 id="安装docker"><a href="#安装docker" class="headerlink" title="安装docker"></a>安装docker</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">wget https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo -O /etc/yum.repos.d/docker-ce.repo</span><br><span class="line"></span><br><span class="line">yum -y install docker-ce-18.06.3.ce-3.el7</span><br><span class="line"></span><br><span class="line">systemctl enable docker &amp;&amp; systemctl start docker</span><br></pre></td></tr></table></figure>
+
+<h3 id="设置docker镜像加速器"><a href="#设置docker镜像加速器" class="headerlink" title="设置docker镜像加速器"></a>设置docker镜像加速器</h3><blockquote>
+<p><a target="_blank" rel="noopener" href="https://ps5u5ikq.mirror.aliyuncs.com/">https://ps5u5ikq.mirror.aliyuncs.com</a> 是我申请的，都可以用，也可以自己去阿里云申请</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p /etc/docker</span><br><span class="line"></span><br><span class="line">sudo tee /etc/docker/daemon.json &lt;&lt;-&#x27;EOF&#x27;</span><br><span class="line">&#123;</span><br><span class="line">  &quot;exec-opts&quot;: [&quot;native.cgroupdriver=systemd&quot;],</span><br><span class="line">  &quot;registry-mirrors&quot;: [&quot;https://ps5u5ikq.mirror.aliyuncs.com&quot;]</span><br><span class="line">&#125;</span><br><span class="line">EOF</span><br><span class="line"></span><br><span class="line">systemctl daemon-reload</span><br><span class="line"></span><br><span class="line">systemctl restart docker</span><br></pre></td></tr></table></figure>
+
+<h3 id="添加阿里云yum源"><a href="#添加阿里云yum源" class="headerlink" title="添加阿里云yum源"></a>添加阿里云yum源</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">cat &gt; /etc/yum.repos.d/kubernetes.repo &lt;&lt; EOF</span><br><span class="line">[kubernetes]</span><br><span class="line">name=Kubernetes</span><br><span class="line">baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64</span><br><span class="line">enabled=1</span><br><span class="line">gpgcheck=0</span><br><span class="line">repo_gpgcheck=0</span><br><span class="line">gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg</span><br><span class="line">EOF</span><br></pre></td></tr></table></figure>
+
+<h3 id="安装kubeadm、kubelet和kubectl"><a href="#安装kubeadm、kubelet和kubectl" class="headerlink" title="安装kubeadm、kubelet和kubectl"></a>安装kubeadm、kubelet和kubectl</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">由于版本更新频繁，这里指定版本号部署</span></span><br><span class="line">yum install -y kubelet-1.18.0 kubeadm-1.18.0 kubectl-1.18.0</span><br></pre></td></tr></table></figure>
+
+<p>为了实现Docker使用的cgroup drvier和kubelet使用的cgroup drver一致，建议修改”/etc/sysconfig/kubelet”文件的内容：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">修改</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">KUBELET_EXTRA_ARGS=<span class="string">&quot;--cgroup-driver=systemd&quot;</span></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">KUBE_PROXY_MODE=<span class="string">&quot;ipvs&quot;</span></span></span><br><span class="line">vim /etc/sysconfig/kubelet</span><br><span class="line"></span><br><span class="line">systemctl enable kubelet</span><br></pre></td></tr></table></figure>
+
+<h2 id="查看K8S所需镜像"><a href="#查看K8S所需镜像" class="headerlink" title="查看K8S所需镜像"></a>查看K8S所需镜像</h2><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubeadm config images list</span><br></pre></td></tr></table></figure>
+
+<h2 id="部署master节点"><a href="#部署master节点" class="headerlink" title="部署master节点"></a>部署master节点</h2><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">由于默认拉取镜像地址k8s.gcr.io国内无法访问，这里需要指定阿里云镜像仓库地址</span></span><br><span class="line">kubeadm init \</span><br><span class="line">  --apiserver-advertise-address=192.168.200.100 \</span><br><span class="line">  --image-repository registry.aliyuncs.com/google_containers \</span><br><span class="line">  --kubernetes-version v1.18.0 \</span><br><span class="line">  --service-cidr=10.96.0.0/12 \</span><br><span class="line">  --pod-network-cidr=10.244.0.0/16</span><br></pre></td></tr></table></figure>
+
+<p>根据提示消息，在Master节点配置kube config</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">mkdir -p $HOME/.kube</span><br><span class="line">sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config</span><br><span class="line">sudo chown $(id -u):$(id -g) $HOME/.kube/config</span><br></pre></td></tr></table></figure>
+
+<h2 id="部署node节点"><a href="#部署node节点" class="headerlink" title="部署node节点"></a>部署node节点</h2><p>根据提示，在192.168.200.101和192.168.200.102上添加如下的命令</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">kubeadm join 192.168.200.100:6443 --token bbzspl.kqudl7akg824xzu1 \</span><br><span class="line">    --discovery-token-ca-cert-hash sha256:811c7a9f9d8d1582342a0c30469a3d62927a11b55e9af3c186ad4b662ebd9a58</span><br></pre></td></tr></table></figure>
+
+<p>默认的token有效期为2小时，当过期之后，该token就不能用了，这时可以使用如下的命令创建token</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">kubeadm token create --print-join-command</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">生成一个永不过期的token</span></span><br><span class="line">kubeadm token create --ttl 0 --print-join-command</span><br></pre></td></tr></table></figure>
+
+<p>查看node是否加入</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">这里应该还没有部署CNI网络插件，所有node都是not ready的状态</span></span><br><span class="line">kubectl get nodes</span><br></pre></td></tr></table></figure>
+
+<h2 id="部署CNI网络插件"><a href="#部署CNI网络插件" class="headerlink" title="部署CNI网络插件"></a>部署CNI网络插件</h2><blockquote>
+<p>kubernetes支持多种网络插件，比如flannel、calico、canal等，任选一种即可，我们这里选择使用calico</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">wget https://raw.githubusercontent.com/bob-zou/bob-zou.github.io/master/asserts/calico.yaml</span><br><span class="line"></span><br><span class="line">kubectl apply -f calico.yaml</span><br></pre></td></tr></table></figure>
+
+<p>查看部署CNI网络插件进度</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl get pods -n kube-system</span><br></pre></td></tr></table></figure>
+
+<p>等待部署完成再次查看 node状态</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">kubectl get nodes</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看集群健康状况</span></span><br><span class="line">kubectl get cs</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">集群信息</span></span><br><span class="line">kubectl cluster-info</span><br></pre></td></tr></table></figure>
+
+<h1 id="验证"><a href="#验证" class="headerlink" title="验证"></a>验证</h1><blockquote>
+<p>在Kubernetes集群中部署一个Nginx程序，测试下集群是否正常工作</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">部署Nginx</span></span><br><span class="line">kubectl create deployment nginx --image=nginx:1.14-alpine</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">暴露端口</span></span><br><span class="line">kubectl expose deployment nginx --port=80 --type=NodePort</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看服务状态</span></span><br><span class="line">kubectl get pods,svc</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">访问nginx</span></span><br><span class="line">curl 192.168.200.100:30305</span><br></pre></td></tr></table></figure>
+
+<h1 id="kubernetes中kubectl命令自动补全"><a href="#kubernetes中kubectl命令自动补全" class="headerlink" title="kubernetes中kubectl命令自动补全"></a>kubernetes中kubectl命令自动补全</h1><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">yum install -y bash-completion</span><br><span class="line"></span><br><span class="line">echo &quot;source /usr/share/bash-completion/bash_completion&quot; &gt;&gt; ~/.bashrc</span><br><span class="line">echo &quot;source &lt;(kubectl completion bash)&quot; &gt;&gt; ~/.bashrc</span><br><span class="line"></span><br><span class="line">source ~/.bashrc</span><br></pre></td></tr></table></figure>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                </ul>
+            
+        </div>
+        
+    <div id='gitalk-container' class="comment link"
+		data-enable='true'
+        data-ae='true'
+        data-ci='aae5f1ef39ad91ac18d0'
+        data-cs='9bdc46e39856d885ab0ccb5de3ef37351d543ec1'
+        data-r='blog.github.io'
+        data-o='bob-zou'
+        data-a='bob-zou'
+        data-d='false'
+    >查看评论</div>
+
+
+    </div>
+    
+</div>
+
+
+    </div>
+    <center>
+        <p class="footerlinks">
+            <a href="#" class="iconfont icon-null"></a>
+            
+                <a href="https://github.com/bob-zou" title="github" class="iconfont icon-github" target="_blank" rel="noopener"> </a>
+            
+                <a href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/wechat.jpg" title="wechat" class="iconfont icon-wechat" target="_blank" rel="noopener"> </a>
+            
+                <a href="mailto:zyp19901009@163.com" title="email" class="iconfont icon-email" target="_blank" rel="noopener"> </a>
+            
+            <a href="#" class="iconfont icon-null"></a>
+        </p>
+
+        <p id="copyright">
+            &copy; 2023 Bob Zou 书山有路勤为径，学海无涯苦作舟
+        </p>
+    </center>
+</div>
+
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MTN9237PJK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-MTN9237PJK');
+</script>
+<!-- End Google Analytics -->
+
+
+</html>

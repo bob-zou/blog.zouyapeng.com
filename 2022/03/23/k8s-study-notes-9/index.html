@@ -1,0 +1,235 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN,en,default" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K8S学习笔记（九）- K8S Pod详解 - 临时容器 - 书山有路勤为径，学海无涯苦作舟</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="BobZou,"> 
+    <meta name="description" content="概述临时容器是一种特殊的容器，该容器可以在现有的Pod中临时运行，以便完成我们发起的操作，比如故障排查。我们应该使用临时容器来检查服务，而不是用临时容器来构建应用程序。
+Pod是kubernetes,"> 
+    <meta name="author" content="Bob Zou"> 
+    <link rel="alternative" href="atom.xml" title="书山有路勤为径，学海无涯苦作舟" type="application/atom+xml"> 
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+<link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">书山有路勤为径，学海无涯苦作舟</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="https://blog.zouyapeng.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">K8S学习笔记（九）- K8S Pod详解 - 临时容器</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">K8S学习笔记（九）- K8S Pod详解 - 临时容器</h1>
+        <div class="stuff">
+            <span>三月 23, 2022</span>
+            
+  <ul class="post-tags-list" itemprop="keywords"><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/docker/" rel="tag">docker</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/k8s/" rel="tag">k8s</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/kubernetes/" rel="tag">kubernetes</a></li></ul>
+
+
+        </div>
+        <div class="content markdown">
+            <h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>临时容器是一种特殊的容器，该容器可以在现有的Pod中临时运行，以便完成我们发起的操作，比如故障排查。<br>我们应该使用临时容器来检查服务，而不是用临时容器来构建应用程序。</p>
+<p>Pod是kubernetes集群进行管理的最小单元，由于Pod是一次性且可以替换的，因此Pod一旦被创建，就无法将容器加入到Pod中。<br>而且，我们通常使用Deployment来删除并替换Pod。<br>但是，有的时候我们需要检查现有Pod的状态，比如对难以复现的故障进行排查。<br>在这些场景中，可以在现有Pod中运行临时容器来检查其状态并运行任意命令。</p>
+<h1 id="什么是临时容器"><a href="#什么是临时容器" class="headerlink" title="什么是临时容器"></a>什么是临时容器</h1><p>临时容器和其他容器的不同之处在于，它们缺少对资源或执行的保证，并且永远不会自动重启，因此不适合用来构建应用程序。<br>临时容器使用和常规容器相同的ContainerSpec来描述，但是许多字段是不兼容或者不允许的。</p>
+<ul>
+<li>临时容器没有端口配置，因此像ports、livenessProbe、readinessProbe这样的字段是没有的。 </li>
+<li>Pod的资源分配是不可变的，因此resources这样的配置临时容器也是没有的。 </li>
+<li>……</li>
+</ul>
+<p>临时容器是使用ephemeralcontainers来进行创建的，而不是直接添加到pod.spec中，所以是无法使用kubectl edit来添加一个临时容器。</p>
+<p>和常规容器一样，将临时容器添加到Pod后，不能更改或删除临时容器。</p>
+<h1 id="临时容器的用途"><a href="#临时容器的用途" class="headerlink" title="临时容器的用途"></a>临时容器的用途</h1><ul>
+<li>当由于容器奔溃或容器镜像不包含调试工具而导致kubectl exec无用的时候，临时容器对于交互式故障排查非常有用。</li>
+<li>比如，像distroless 镜像允许用户部署最小的容器镜像，从而减少攻击面并减少故障和漏洞的暴露。由于distroless 镜像不包含Shell或任何的调试工具，因此很难单独使用kubectl exec命令进行故障排查。</li>
+<li>使用临时容器的时候，启用<a target="_blank" rel="noopener" href="https://kubernetes.io/zh/docs/tasks/configure-pod-container/share-process-namespace/">进程命名空间共享</a> 很有帮助，可以查看其他容器中的进程。</li>
+</ul>
+<h1 id="临时容器的配置"><a href="#临时容器的配置" class="headerlink" title="临时容器的配置"></a>临时容器的配置</h1><p>目前来说，临时容器默认是关闭的。<br>查看临时容器是否开启：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubelet -h | grep EphemeralContainers</span><br></pre></td></tr></table></figure>
+<p>在每个节点（不管Master节点还是Node节点）修改kubectl的参数：</p>
+<blockquote>
+<p>注意：kubelet的启动文件的路径是/usr/lib/systemd/system/kubelet.service.d/10-kubeadm.conf</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/sysconfig/kubelet</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">修改增加--feature-gates EphemeralContainers=<span class="literal">true</span></span></span><br><span class="line">KUBELET_EXTRA_ARGS=&quot;--cgroup-driver=systemd --feature-gates EphemeralContainers=true&quot;</span><br><span class="line">KUBE_PROXY_MODE=&quot;ipvs&quot;</span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vim /var/lib/kubelet/config.yaml</span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">kubelet.config.k8s.io/v1beta1</span></span><br><span class="line"><span class="attr">authentication:</span></span><br><span class="line">  <span class="attr">anonymous:</span></span><br><span class="line">    <span class="attr">enabled:</span> <span class="string">falsevim</span> </span><br><span class="line">  <span class="attr">webhook:</span></span><br><span class="line">    <span class="attr">cacheTTL:</span> <span class="string">0s</span></span><br><span class="line">    <span class="attr">enabled:</span> <span class="literal">true</span></span><br><span class="line">  <span class="attr">x509:</span></span><br><span class="line">    <span class="attr">clientCAFile:</span> <span class="string">/etc/kubernetes/pki/ca.crt</span></span><br><span class="line"><span class="attr">authorization:</span></span><br><span class="line">  <span class="attr">mode:</span> <span class="string">Webhook</span></span><br><span class="line">  <span class="attr">webhook:</span></span><br><span class="line">    <span class="attr">cacheAuthorizedTTL:</span> <span class="string">0s</span></span><br><span class="line">    <span class="attr">cacheUnauthorizedTTL:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">clusterDNS:</span></span><br><span class="line"><span class="bullet">-</span> <span class="number">10.96</span><span class="number">.0</span><span class="number">.10</span></span><br><span class="line"><span class="attr">clusterDomain:</span> <span class="string">cluster.local</span></span><br><span class="line"><span class="attr">cpuManagerReconcilePeriod:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">evictionPressureTransitionPeriod:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">fileCheckFrequency:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">healthzBindAddress:</span> <span class="number">127.0</span><span class="number">.0</span><span class="number">.1</span></span><br><span class="line"><span class="attr">healthzPort:</span> <span class="number">10248</span></span><br><span class="line"><span class="attr">httpCheckFrequency:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">imageMinimumGCAge:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">KubeletConfiguration</span></span><br><span class="line"><span class="attr">nodeStatusReportFrequency:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">nodeStatusUpdateFrequency:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">rotateCertificates:</span> <span class="literal">true</span></span><br><span class="line"><span class="attr">runtimeRequestTimeout:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">staticPodPath:</span> <span class="string">/etc/kubernetes/manifests</span></span><br><span class="line"><span class="attr">streamingConnectionIdleTimeout:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">syncFrequency:</span> <span class="string">0s</span></span><br><span class="line"><span class="attr">volumeStatsAggPeriod:</span> <span class="string">0s</span></span><br><span class="line"><span class="comment"># 修改部分</span></span><br><span class="line"><span class="attr">featureGates:</span></span><br><span class="line">  <span class="attr">EphemeralContainers:</span> <span class="literal">true</span></span><br></pre></td></tr></table></figure>
+<p>加载配置文件重启kubelet：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">systemctl daemon-reload</span><br><span class="line">systemctl restart kubelet</span><br></pre></td></tr></table></figure>
+<p>在Master节点修改kube-apiserver.yaml和kube-scheduler.yaml：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/kubernetes/manifests/kube-apiserver.yaml</span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">annotations:</span></span><br><span class="line">    <span class="attr">kubeadm.kubernetes.io/kube-apiserver.advertise-address.endpoint:</span> <span class="number">192.168</span><span class="number">.49</span><span class="number">.100</span><span class="string">:6443</span></span><br><span class="line">  <span class="attr">creationTimestamp:</span> <span class="literal">null</span></span><br><span class="line">  <span class="attr">labels:</span></span><br><span class="line">    <span class="attr">component:</span> <span class="string">kube-apiserver</span></span><br><span class="line">    <span class="attr">tier:</span> <span class="string">control-plane</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">kube-apiserver</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">command:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">kube-apiserver</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--advertise-address=192.168.49.100</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--allow-privileged=true</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--authorization-mode=Node,RBAC</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--client-ca-file=/etc/kubernetes/pki/ca.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--enable-admission-plugins=NodeRestriction</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--enable-bootstrap-token-auth=true</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--etcd-cafile=/etc/kubernetes/pki/etcd/ca.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--etcd-certfile=/etc/kubernetes/pki/apiserver-etcd-client.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--etcd-keyfile=/etc/kubernetes/pki/apiserver-etcd-client.key</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--etcd-servers=https://127.0.0.1:2379</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--insecure-port=0</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--kubelet-client-certificate=/etc/kubernetes/pki/apiserver-kubelet-client.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--kubelet-client-key=/etc/kubernetes/pki/apiserver-kubelet-client.key</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--proxy-client-cert-file=/etc/kubernetes/pki/front-proxy-client.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--proxy-client-key-file=/etc/kubernetes/pki/front-proxy-client.key</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--requestheader-allowed-names=front-proxy-client</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--requestheader-client-ca-file=/etc/kubernetes/pki/front-proxy-ca.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--requestheader-extra-headers-prefix=X-Remote-Extra-</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--requestheader-group-headers=X-Remote-Group</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--requestheader-username-headers=X-Remote-User</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--secure-port=6443</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--service-account-issuer=https://kubernetes.default.svc.cluster.local</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--service-account-key-file=/etc/kubernetes/pki/sa.pub</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--service-account-signing-key-file=/etc/kubernetes/pki/sa.key</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--service-cluster-ip-range=10.96.0.0/12</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--tls-cert-file=/etc/kubernetes/pki/apiserver.crt</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--tls-private-key-file=/etc/kubernetes/pki/apiserver.key</span></span><br><span class="line">    <span class="comment"># 修改部分</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--feature-gates=EphemeralContainers=true</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/kubernetes/manifests/kube-scheduler.yaml</span><br></pre></td></tr></table></figure>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">creationTimestamp:</span> <span class="literal">null</span></span><br><span class="line">  <span class="attr">labels:</span></span><br><span class="line">    <span class="attr">component:</span> <span class="string">kube-scheduler</span></span><br><span class="line">    <span class="attr">tier:</span> <span class="string">control-plane</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">kube-scheduler</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">kube-system</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">command:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">kube-scheduler</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--authentication-kubeconfig=/etc/kubernetes/scheduler.conf</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--authorization-kubeconfig=/etc/kubernetes/scheduler.conf</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--bind-address=127.0.0.1</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--kubeconfig=/etc/kubernetes/scheduler.conf</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--leader-elect=true</span></span><br><span class="line">    <span class="comment"># 修改部分</span></span><br><span class="line">    <span class="bullet">-</span> <span class="string">--feature-gates=EphemeralContainers=true</span></span><br></pre></td></tr></table></figure>
+
+<h1 id="使用临时容器在线debug"><a href="#使用临时容器在线debug" class="headerlink" title="使用临时容器在线debug"></a>使用临时容器在线debug</h1><p>创建一个nginx.yaml文件，内容如下：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">nginx</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">shareProcessNamespace:</span> <span class="literal">true</span> <span class="comment"># 这个配置非常重要，一定要配置</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">nginx:1.17.1</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f nginx.yaml</span><br></pre></td></tr></table></figure>
+<p>创建ec.json文件，内容如下（注意：name是Pod的名称）：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="punctuation">&#123;</span></span><br><span class="line">    <span class="attr">&quot;apiVersion&quot;</span><span class="punctuation">:</span> <span class="string">&quot;v1&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;kind&quot;</span><span class="punctuation">:</span> <span class="string">&quot;EphemeralContainers&quot;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;metadata&quot;</span><span class="punctuation">:</span> <span class="punctuation">&#123;</span></span><br><span class="line">            <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;nginx&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">,</span></span><br><span class="line">    <span class="attr">&quot;ephemeralContainers&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span><span class="punctuation">&#123;</span></span><br><span class="line">        <span class="attr">&quot;command&quot;</span><span class="punctuation">:</span> <span class="punctuation">[</span></span><br><span class="line">            <span class="string">&quot;sh&quot;</span></span><br><span class="line">        <span class="punctuation">]</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;image&quot;</span><span class="punctuation">:</span> <span class="string">&quot;busybox&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;imagePullPolicy&quot;</span><span class="punctuation">:</span> <span class="string">&quot;IfNotPresent&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;name&quot;</span><span class="punctuation">:</span> <span class="string">&quot;debugger&quot;</span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;stdin&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;tty&quot;</span><span class="punctuation">:</span> <span class="literal"><span class="keyword">true</span></span><span class="punctuation">,</span></span><br><span class="line">        <span class="attr">&quot;terminationMessagePolicy&quot;</span><span class="punctuation">:</span> <span class="string">&quot;File&quot;</span></span><br><span class="line">    <span class="punctuation">&#125;</span><span class="punctuation">]</span></span><br><span class="line"><span class="punctuation">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<p>使用下面的命令更新已经运行的容器：</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">kubectl replace --raw /api/v1/namespaces/default/pods/nginx/ephemeralcontainers  -f ec.json</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看Pod</span></span><br><span class="line">kubectl describe pod nginx</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">连接容器</span></span><br><span class="line">kubectl exec -it nginx -c debugger -- sh</span><br><span class="line">kubectl attach -it nginx -c debugger</span><br></pre></td></tr></table></figure>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                </ul>
+            
+        </div>
+        
+    <div id='gitalk-container' class="comment link"
+		data-enable='true'
+        data-ae='true'
+        data-ci='aae5f1ef39ad91ac18d0'
+        data-cs='9bdc46e39856d885ab0ccb5de3ef37351d543ec1'
+        data-r='blog.github.io'
+        data-o='bob-zou'
+        data-a='bob-zou'
+        data-d='false'
+    >查看评论</div>
+
+
+    </div>
+    
+</div>
+
+
+    </div>
+    <center>
+        <p class="footerlinks">
+            <a href="#" class="iconfont icon-null"></a>
+            
+                <a href="https://github.com/bob-zou" title="github" class="iconfont icon-github" target="_blank" rel="noopener"> </a>
+            
+                <a href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/wechat.jpg" title="wechat" class="iconfont icon-wechat" target="_blank" rel="noopener"> </a>
+            
+                <a href="mailto:zyp19901009@163.com" title="email" class="iconfont icon-email" target="_blank" rel="noopener"> </a>
+            
+            <a href="#" class="iconfont icon-null"></a>
+        </p>
+
+        <p id="copyright">
+            &copy; 2023 Bob Zou 书山有路勤为径，学海无涯苦作舟
+        </p>
+    </center>
+</div>
+
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MTN9237PJK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-MTN9237PJK');
+</script>
+<!-- End Google Analytics -->
+
+
+</html>

@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN,en,default" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K8S学习笔记（五）- K8S Pod详解 - Pod介绍 - 书山有路勤为径，学海无涯苦作舟</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="BobZou,"> 
+    <meta name="description" content="每个Pod中都包含一个或者多个容器，这些容器可以分为两类
+用户程序所在的容器，数量可多可少
+Pause容器，这是每个Pod都会有的一个根容器，它的作用有两个
+可以以它为依据，评估整个Pod的健康状况,"> 
+    <meta name="author" content="Bob Zou"> 
+    <link rel="alternative" href="atom.xml" title="书山有路勤为径，学海无涯苦作舟" type="application/atom+xml"> 
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+<link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">书山有路勤为径，学海无涯苦作舟</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="https://blog.zouyapeng.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">K8S学习笔记（五）- K8S Pod详解 - Pod介绍</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">K8S学习笔记（五）- K8S Pod详解 - Pod介绍</h1>
+        <div class="stuff">
+            <span>三月 09, 2022</span>
+            
+  <ul class="post-tags-list" itemprop="keywords"><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/docker/" rel="tag">docker</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/k8s/" rel="tag">k8s</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/kubernetes/" rel="tag">kubernetes</a></li></ul>
+
+
+        </div>
+        <div class="content markdown">
+            <h2 id="每个Pod中都包含一个或者多个容器，这些容器可以分为两类"><a href="#每个Pod中都包含一个或者多个容器，这些容器可以分为两类" class="headerlink" title="每个Pod中都包含一个或者多个容器，这些容器可以分为两类"></a>每个Pod中都包含一个或者多个容器，这些容器可以分为两类</h2><ul>
+<li>用户程序所在的容器，数量可多可少</li>
+<li>Pause容器，这是每个Pod都会有的一个根容器，它的作用有两个<ul>
+<li>可以以它为依据，评估整个Pod的健康状况</li>
+<li>可以在根容器上设置IP地址，其它容器都共享此IP（Pod的IP），以实现Pod内部的网络通信（这里是Pod内部的通讯，Pod之间的通讯采用虚拟二层网络技术来实现，我们当前环境使用的是Calico）</li>
+</ul>
+</li>
+</ul>
+<h2 id="Pod-定义"><a href="#Pod-定义" class="headerlink" title="Pod 定义"></a>Pod 定义</h2><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span>     <span class="comment">#必选，版本号，例如v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span>       　 <span class="comment">#必选，资源类型，例如 Pod</span></span><br><span class="line"><span class="attr">metadata:</span>       　 <span class="comment">#必选，元数据</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">string</span>     <span class="comment">#必选，Pod名称</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">string</span>  <span class="comment">#Pod所属的命名空间,默认为&quot;default&quot;</span></span><br><span class="line">  <span class="attr">labels:</span>       　　  <span class="comment">#自定义标签列表</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>      　          </span><br><span class="line"><span class="attr">spec:</span>  <span class="comment">#必选，Pod中容器的详细定义</span></span><br><span class="line">  <span class="attr">containers:</span>  <span class="comment">#必选，Pod中容器列表</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>   <span class="comment">#必选，容器名称</span></span><br><span class="line">    <span class="attr">image:</span> <span class="string">string</span>  <span class="comment">#必选，容器的镜像名称</span></span><br><span class="line">    <span class="attr">imagePullPolicy:</span> [ <span class="string">Always|Never|IfNotPresent</span> ]  <span class="comment">#获取镜像的策略 </span></span><br><span class="line">    <span class="attr">command:</span> [<span class="string">string</span>]   <span class="comment">#容器的启动命令列表，如不指定，使用打包时使用的启动命令</span></span><br><span class="line">    <span class="attr">args:</span> [<span class="string">string</span>]      <span class="comment">#容器的启动命令参数列表</span></span><br><span class="line">    <span class="attr">workingDir:</span> <span class="string">string</span>  <span class="comment">#容器的工作目录</span></span><br><span class="line">    <span class="attr">volumeMounts:</span>       <span class="comment">#挂载到容器内部的存储卷配置</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>      <span class="comment">#引用pod定义的共享存储卷的名称，需用volumes[]部分定义的的卷名</span></span><br><span class="line">      <span class="attr">mountPath:</span> <span class="string">string</span> <span class="comment">#存储卷在容器内mount的绝对路径，应少于512字符</span></span><br><span class="line">      <span class="attr">readOnly:</span> <span class="string">boolean</span> <span class="comment">#是否为只读模式</span></span><br><span class="line">    <span class="attr">ports:</span> <span class="comment">#需要暴露的端口库号列表</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>        <span class="comment">#端口的名称</span></span><br><span class="line">      <span class="attr">containerPort:</span> <span class="string">int</span>  <span class="comment">#容器需要监听的端口号</span></span><br><span class="line">      <span class="attr">hostPort:</span> <span class="string">int</span>       <span class="comment">#容器所在主机需要监听的端口号，默认与Container相同</span></span><br><span class="line">      <span class="attr">protocol:</span> <span class="string">string</span>    <span class="comment">#端口协议，支持TCP和UDP，默认TCP</span></span><br><span class="line">    <span class="attr">env:</span>   <span class="comment">#容器运行前需设置的环境变量列表</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>  <span class="comment">#环境变量名称</span></span><br><span class="line">      <span class="attr">value:</span> <span class="string">string</span> <span class="comment">#环境变量的值</span></span><br><span class="line">    <span class="attr">resources:</span> <span class="comment">#资源限制和请求的设置</span></span><br><span class="line">      <span class="attr">limits:</span>  <span class="comment">#资源限制的设置</span></span><br><span class="line">        <span class="attr">cpu:</span> <span class="string">string</span>     <span class="comment">#Cpu的限制，单位为core数，将用于docker run --cpu-shares参数</span></span><br><span class="line">        <span class="attr">memory:</span> <span class="string">string</span>  <span class="comment">#内存限制，单位可以为Mib/Gib，将用于docker run --memory参数</span></span><br><span class="line">      <span class="attr">requests:</span> <span class="comment">#资源请求的设置</span></span><br><span class="line">        <span class="attr">cpu:</span> <span class="string">string</span>    <span class="comment">#Cpu请求，容器启动的初始可用数量</span></span><br><span class="line">        <span class="attr">memory:</span> <span class="string">string</span> <span class="comment">#内存请求,容器启动的初始可用数量</span></span><br><span class="line">    <span class="attr">lifecycle:</span> <span class="comment">#生命周期钩子</span></span><br><span class="line">		<span class="attr">postStart:</span> <span class="comment">#容器启动后立即执行此钩子,如果执行失败,会根据重启策略进行重启</span></span><br><span class="line">		<span class="attr">preStop:</span> <span class="comment">#容器终止前执行此钩子,无论结果如何,容器都会终止</span></span><br><span class="line">    <span class="attr">livenessProbe:</span>  <span class="comment">#对Pod内各容器健康检查的设置，当探测无响应几次后将自动重启该容器</span></span><br><span class="line">      <span class="attr">exec:</span>       　 <span class="comment">#对Pod容器内检查方式设置为exec方式</span></span><br><span class="line">        <span class="attr">command:</span> [<span class="string">string</span>]  <span class="comment">#exec方式需要制定的命令或脚本</span></span><br><span class="line">      <span class="attr">httpGet:</span>       <span class="comment">#对Pod内个容器健康检查方法设置为HttpGet，需要制定Path、port</span></span><br><span class="line">        <span class="attr">path:</span> <span class="string">string</span></span><br><span class="line">        <span class="attr">port:</span> <span class="string">number</span></span><br><span class="line">        <span class="attr">host:</span> <span class="string">string</span></span><br><span class="line">        <span class="attr">scheme:</span> <span class="string">string</span></span><br><span class="line">        <span class="attr">HttpHeaders:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span></span><br><span class="line">          <span class="attr">value:</span> <span class="string">string</span></span><br><span class="line">      <span class="attr">tcpSocket:</span>     <span class="comment">#对Pod内个容器健康检查方式设置为tcpSocket方式</span></span><br><span class="line">         <span class="attr">port:</span> <span class="string">number</span></span><br><span class="line">       <span class="attr">initialDelaySeconds:</span> <span class="number">0</span>       <span class="comment">#容器启动完成后首次探测的时间，单位为秒</span></span><br><span class="line">       <span class="attr">timeoutSeconds:</span> <span class="number">0</span>    　　    <span class="comment">#对容器健康检查探测等待响应的超时时间，单位秒，默认1秒</span></span><br><span class="line">       <span class="attr">periodSeconds:</span> <span class="number">0</span>     　　    <span class="comment">#对容器监控检查的定期探测时间设置，单位秒，默认10秒一次</span></span><br><span class="line">       <span class="attr">successThreshold:</span> <span class="number">0</span></span><br><span class="line">       <span class="attr">failureThreshold:</span> <span class="number">0</span></span><br><span class="line">       <span class="attr">securityContext:</span></span><br><span class="line">         <span class="attr">privileged:</span> <span class="literal">false</span></span><br><span class="line">  <span class="attr">restartPolicy:</span> [<span class="string">Always</span> <span class="string">|</span> <span class="string">Never</span> <span class="string">|</span> <span class="string">OnFailure</span>]  <span class="comment">#Pod的重启策略</span></span><br><span class="line">  <span class="attr">nodeName:</span> <span class="string">&lt;string&gt;</span> <span class="comment">#设置NodeName表示将该Pod调度到指定到名称的node节点上</span></span><br><span class="line">  <span class="attr">nodeSelector:</span> <span class="string">obeject</span> <span class="comment">#设置NodeSelector表示将该Pod调度到包含这个label的node上</span></span><br><span class="line">  <span class="attr">imagePullSecrets:</span> <span class="comment">#Pull镜像时使用的secret名称，以key：secretkey格式指定</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span></span><br><span class="line">  <span class="attr">hostNetwork:</span> <span class="literal">false</span>   <span class="comment">#是否使用主机网络模式，默认为false，如果设置为true，表示使用宿主机网络</span></span><br><span class="line">  <span class="attr">volumes:</span>   <span class="comment">#在该pod上定义共享存储卷列表</span></span><br><span class="line">  <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">string</span>    <span class="comment">#共享存储卷名称 （volumes类型有很多种）</span></span><br><span class="line">    <span class="attr">emptyDir:</span> &#123;&#125;       <span class="comment">#类型为emtyDir的存储卷，与Pod同生命周期的一个临时目录。为空值</span></span><br><span class="line">    <span class="attr">hostPath:</span> <span class="string">string</span>   <span class="comment">#类型为hostPath的存储卷，表示挂载Pod所在宿主机的目录</span></span><br><span class="line">      <span class="attr">path:</span> <span class="string">string</span>      　　        <span class="comment">#Pod所在宿主机的目录，将被用于同期中mount的目录</span></span><br><span class="line">    <span class="attr">secret:</span>       　　　<span class="comment">#类型为secret的存储卷，挂载集群与定义的secret对象到容器内部</span></span><br><span class="line">      <span class="attr">scretname:</span> <span class="string">string</span>  </span><br><span class="line">      <span class="attr">items:</span>     </span><br><span class="line">      <span class="bullet">-</span> <span class="attr">key:</span> <span class="string">string</span></span><br><span class="line">        <span class="attr">path:</span> <span class="string">string</span></span><br><span class="line">    <span class="attr">configMap:</span>         <span class="comment">#类型为configMap的存储卷，挂载预定义的configMap对象到容器内部</span></span><br><span class="line">      <span class="attr">name:</span> <span class="string">string</span></span><br><span class="line">      <span class="attr">items:</span></span><br><span class="line">      <span class="bullet">-</span> <span class="attr">key:</span> <span class="string">string</span></span><br><span class="line">        <span class="attr">path:</span> <span class="string">string</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看某种资源可以配置的一级配置</span></span><br><span class="line">kubectl explain 资源类型 </span><br><span class="line">kubectl explain pod</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看属性的子属性</span></span><br><span class="line">kubectl explain 资源类型.属性</span><br><span class="line">kubectl explain pod.metadata</span><br></pre></td></tr></table></figure>
+
+<p>在kubernetes中基本所有资源的一级属性都是一样的，主要包含5个部分：</p>
+<ul>
+<li>apiVersion   <string>：版本，有kubernetes内部定义，版本号必须用kubectl api-versions查询</li>
+<li>kind <string>：类型，有kubernetes内部定义，类型必须用kubectl api-resources查询</li>
+<li>metadata   <Object>：元数据，主要是资源标识和说明，常用的有name、namespace、labels等</li>
+<li>spec <Object>：描述，这是配置中最重要的一部分，里面是对各种资源配置的详细描述</li>
+<li>spec <Object>：描述，这是配置中最重要的一部分，里面是对各种资源配置的详细描述</li>
+</ul>
+<p>在上面的属性中，spec是接下来研究的重点，继续看下它的常见子属性：</p>
+<ul>
+<li>containers   &lt;[]Object&gt;：容器列表，用于定义容器的详细信息</li>
+<li>nodeName <String>：根据nodeName的值将Pod调度到指定的Node节点上</li>
+<li>nodeSelector   &lt;map[]&gt; ：根据NodeSelector中定义的信息选择该Pod调度到包含这些Label的Node上</li>
+<li>hostNetwork  <boolean>：是否使用主机网络模式，默认为false，如果设置为true，表示使用宿主机网络</li>
+<li>volumes      &lt;[]Object&gt; ：存储卷，用于定义Pod上面挂载的存储信息</li>
+<li>restartPolicy    <string>：重启策略，表示Pod在遇到故障的时候的处理策略</li>
+</ul>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                </ul>
+            
+        </div>
+        
+    <div id='gitalk-container' class="comment link"
+		data-enable='true'
+        data-ae='true'
+        data-ci='aae5f1ef39ad91ac18d0'
+        data-cs='9bdc46e39856d885ab0ccb5de3ef37351d543ec1'
+        data-r='blog.github.io'
+        data-o='bob-zou'
+        data-a='bob-zou'
+        data-d='false'
+    >查看评论</div>
+
+
+    </div>
+    
+</div>
+
+
+    </div>
+    <center>
+        <p class="footerlinks">
+            <a href="#" class="iconfont icon-null"></a>
+            
+                <a href="https://github.com/bob-zou" title="github" class="iconfont icon-github" target="_blank" rel="noopener"> </a>
+            
+                <a href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/wechat.jpg" title="wechat" class="iconfont icon-wechat" target="_blank" rel="noopener"> </a>
+            
+                <a href="mailto:zyp19901009@163.com" title="email" class="iconfont icon-email" target="_blank" rel="noopener"> </a>
+            
+            <a href="#" class="iconfont icon-null"></a>
+        </p>
+
+        <p id="copyright">
+            &copy; 2023 Bob Zou 书山有路勤为径，学海无涯苦作舟
+        </p>
+    </center>
+</div>
+
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MTN9237PJK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-MTN9237PJK');
+</script>
+<!-- End Google Analytics -->
+
+
+</html>

@@ -1,0 +1,559 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN,en,default" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K8S学习笔记（三）- K8S资源管理 - 书山有路勤为径，学海无涯苦作舟</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="BobZou,"> 
+    <meta name="description" content="资源管理介绍
+在Kubernetes中，所有的内容都抽象为资源，用户需要通过操作资源来管理Kubernetes。学习kubernetes的核心，就是学习如何对集群中的Pod、Pod控制器、Servi,"> 
+    <meta name="author" content="Bob Zou"> 
+    <link rel="alternative" href="atom.xml" title="书山有路勤为径，学海无涯苦作舟" type="application/atom+xml"> 
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+<link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">书山有路勤为径，学海无涯苦作舟</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="https://blog.zouyapeng.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">K8S学习笔记（三）- K8S资源管理</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">K8S学习笔记（三）- K8S资源管理</h1>
+        <div class="stuff">
+            <span>三月 06, 2022</span>
+            
+  <ul class="post-tags-list" itemprop="keywords"><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/docker/" rel="tag">docker</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/k8s/" rel="tag">k8s</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/kubernetes/" rel="tag">kubernetes</a></li></ul>
+
+
+        </div>
+        <div class="content markdown">
+            <h1 id="资源管理介绍"><a href="#资源管理介绍" class="headerlink" title="资源管理介绍"></a>资源管理介绍</h1><blockquote>
+<p>在Kubernetes中，所有的内容都抽象为资源，用户需要通过操作资源来管理Kubernetes。<br>学习kubernetes的核心，就是学习如何对集群中的Pod、Pod控制器、Service、存储等各种资源进行操作。</p>
+</blockquote>
+<ul>
+<li>Kubernetes的本质就是一个集群系统，用户可以在集群中部署各种服务。所谓的部署服务，其实就是在Kubernetes集群中运行一个个的容器，并将指定的程序跑在容器中。</li>
+<li>Kubernetes的最小管理单元是<code>Pod</code>而不是容器，所以只能将容器放在<code>Pod</code>中，而Kubernetes一般也不会直接管理<code>Pod</code>，而是通过<code>Pod控制器</code>来管理<code>Pod</code>的.</li>
+<li><code>Pod</code>提供服务之后，就需要考虑如何访问<code>Pod</code>中的服务，Kubernetes提供了<code>Service</code>资源实现这个功能。</li>
+<li>当然，如果<code>Pod</code>中程序的数据需要持久化，Kubernetes还提供了各种<code>存储</code>系统。<br><img src="1.png" alt="1"></li>
+</ul>
+<h1 id="资源管理方式"><a href="#资源管理方式" class="headerlink" title="资源管理方式"></a>资源管理方式</h1><ul>
+<li>命令式对象管理：直接使用命令去操作kubernetes的资源<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl run nginx-pod --image=nginx:1.17.1 --port=80</span><br></pre></td></tr></table></figure></li>
+<li>命令式对象配置：通过命令配置和配置文件去操作kubernetes的资源<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl create/patch -f nginx-pod.yaml</span><br></pre></td></tr></table></figure></li>
+<li>声明式对象配置：通过apply命令和配置文件去操作kubernetes的资源<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f nginx-pod.yaml</span><br></pre></td></tr></table></figure>
+<table>
+<thead>
+<tr>
+<th>管理方式</th>
+<th>操作</th>
+<th>适用场景</th>
+<th>优点</th>
+<th>缺点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>命令式对象管理</td>
+<td>对象</td>
+<td>测试</td>
+<td>简单</td>
+<td>只能操作活动对象，无法审计、跟踪</td>
+</tr>
+<tr>
+<td>命令式对象配置</td>
+<td>文件</td>
+<td>开发</td>
+<td>可以审计，追踪</td>
+<td>项目大的时候，配置文件多，操作麻烦</td>
+</tr>
+<tr>
+<td>声明式对象配置</td>
+<td>目录</td>
+<td>开发</td>
+<td>支持目录操作</td>
+<td>意外情况下难以调试</td>
+</tr>
+</tbody></table>
+</li>
+</ul>
+<h2 id="命令式对象管理"><a href="#命令式对象管理" class="headerlink" title="命令式对象管理"></a>命令式对象管理</h2><h3 id="kubectl命令"><a href="#kubectl命令" class="headerlink" title="kubectl命令"></a>kubectl命令</h3><blockquote>
+<p>kubectl是kubernetes集群的命令行工具，通过它能够对集群本身进行管理，并能够在集群上进行容器化应用的安装和部署。</p>
+</blockquote>
+<h4 id="命令的语法如下"><a href="#命令的语法如下" class="headerlink" title="命令的语法如下"></a>命令的语法如下</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl [command] [type] [name] [flags]</span><br></pre></td></tr></table></figure>
+<ul>
+<li>command：指定要对资源执行的操作，比如create、get、delete</li>
+<li>type：指定资源的类型，比如deployment、pod、service</li>
+<li>name：指定资源的名称，名称大小写敏感</li>
+<li>flags：指定额外的可选参数</li>
+</ul>
+<h4 id="操作（command）"><a href="#操作（command）" class="headerlink" title="操作（command）"></a>操作（command）</h4><blockquote>
+<p>kubernetes允许对资源进行多种操作，可以通过–help查看详细的操作命令</p>
+</blockquote>
+<h5 id="基本命令"><a href="#基本命令" class="headerlink" title="基本命令"></a>基本命令</h5><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>翻译</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>create</td>
+<td>创建</td>
+<td>创建一个资源</td>
+</tr>
+<tr>
+<td>edit</td>
+<td>编辑</td>
+<td>编辑一个资源</td>
+</tr>
+<tr>
+<td>get</td>
+<td>获取</td>
+<td>获取一个资源</td>
+</tr>
+<tr>
+<td>patch</td>
+<td>更新</td>
+<td>更新一个资源</td>
+</tr>
+<tr>
+<td>delete</td>
+<td>删除</td>
+<td>删除一个资源</td>
+</tr>
+<tr>
+<td>explain</td>
+<td>解释</td>
+<td>展示资源文档</td>
+</tr>
+</tbody></table>
+<h5 id="运行和调试"><a href="#运行和调试" class="headerlink" title="运行和调试"></a>运行和调试</h5><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>翻译</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>run</td>
+<td>运行</td>
+<td>在集群中运行一个指定的镜像</td>
+</tr>
+<tr>
+<td>expose</td>
+<td>暴露</td>
+<td>暴露资源为Service</td>
+</tr>
+<tr>
+<td>describe</td>
+<td>描述</td>
+<td>显示资源内部信息</td>
+</tr>
+<tr>
+<td>logs</td>
+<td>日志</td>
+<td>输出容器在Pod中的日志</td>
+</tr>
+<tr>
+<td>attach</td>
+<td>追加</td>
+<td>进入运行中的容器</td>
+</tr>
+<tr>
+<td>exec</td>
+<td>执行</td>
+<td>执行容器中的一个命令</td>
+</tr>
+<tr>
+<td>cp</td>
+<td>负责</td>
+<td>在Pod内外复制文件</td>
+</tr>
+<tr>
+<td>rollout</td>
+<td>回滚</td>
+<td>管理资源的发布</td>
+</tr>
+<tr>
+<td>scale</td>
+<td>扩缩容</td>
+<td>扩（缩）容Pod的数量</td>
+</tr>
+<tr>
+<td>autocale</td>
+<td>自动扩缩容</td>
+<td>自动调整Pod的数量</td>
+</tr>
+</tbody></table>
+<h5 id="高级命令"><a href="#高级命令" class="headerlink" title="高级命令"></a>高级命令</h5><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>翻译</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>apply</td>
+<td>应用</td>
+<td>通过文件对资源进行配置</td>
+</tr>
+<tr>
+<td>label</td>
+<td>标签</td>
+<td>更新资源上的标签</td>
+</tr>
+</tbody></table>
+<h5 id="其他命令"><a href="#其他命令" class="headerlink" title="其他命令"></a>其他命令</h5><table>
+<thead>
+<tr>
+<th>命令</th>
+<th>翻译</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>cluster-info</td>
+<td>集群信息</td>
+<td>显示集群信息</td>
+</tr>
+<tr>
+<td>version</td>
+<td>版本</td>
+<td>显示当前Client和Server的版本</td>
+</tr>
+</tbody></table>
+<h4 id="资源类型（type）"><a href="#资源类型（type）" class="headerlink" title="资源类型（type）"></a>资源类型（type）</h4><blockquote>
+<p>kubernetes中所有的内容都抽象为资源，可以通过下面的命令进行查看</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl api-resources</span><br></pre></td></tr></table></figure>
+<p>下面列举一下常用的资源</p>
+<h5 id="集群级别资源"><a href="#集群级别资源" class="headerlink" title="集群级别资源"></a>集群级别资源</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>nodes</td>
+<td>no</td>
+<td>集群组成部分</td>
+</tr>
+<tr>
+<td>namespaces</td>
+<td>ns</td>
+<td>隔离Pod</td>
+</tr>
+</tbody></table>
+<h5 id="Pod资源"><a href="#Pod资源" class="headerlink" title="Pod资源"></a>Pod资源</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Pods</td>
+<td>po</td>
+<td>装载容器</td>
+</tr>
+</tbody></table>
+<h5 id="Pod资源控制器"><a href="#Pod资源控制器" class="headerlink" title="Pod资源控制器"></a>Pod资源控制器</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>replicationcontrollers</td>
+<td>rc</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>replicasets</td>
+<td>rs</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>deployments</td>
+<td>deploy</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>daemonsets</td>
+<td>ds</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>jobs</td>
+<td></td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>cronjobs</td>
+<td>cj</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>horizontalpodautoscalers</td>
+<td>hpa</td>
+<td>控制Pod资源</td>
+</tr>
+<tr>
+<td>statefulsets</td>
+<td>sts</td>
+<td>控制Pod资源</td>
+</tr>
+</tbody></table>
+<h5 id="服务发现资源"><a href="#服务发现资源" class="headerlink" title="服务发现资源"></a>服务发现资源</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>services</td>
+<td>svc</td>
+<td>统一Pod对外接口</td>
+</tr>
+<tr>
+<td>ingress</td>
+<td>ing</td>
+<td>统一Pod对外接口</td>
+</tr>
+</tbody></table>
+<h5 id="存储资源"><a href="#存储资源" class="headerlink" title="存储资源"></a>存储资源</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>volumeattachments</td>
+<td></td>
+<td>存储</td>
+</tr>
+<tr>
+<td>persistentvolumes</td>
+<td>pv</td>
+<td>存储</td>
+</tr>
+<tr>
+<td>persistentvolumeclaims</td>
+<td>pvc</td>
+<td>存储</td>
+</tr>
+</tbody></table>
+<h5 id="配置资源"><a href="#配置资源" class="headerlink" title="配置资源"></a>配置资源</h5><table>
+<thead>
+<tr>
+<th>名称</th>
+<th>缩写</th>
+<th>作用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>configmaps</td>
+<td>cm</td>
+<td>配置</td>
+</tr>
+<tr>
+<td>secrets</td>
+<td></td>
+<td>配置</td>
+</tr>
+</tbody></table>
+<h4 id="示例"><a href="#示例" class="headerlink" title="示例"></a>示例</h4><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">kubectl create ns dev</span><br><span class="line">kubectl run nginx --image=nginx:1.17.1 -n dev</span><br><span class="line">kubectl get pods -n dev</span><br><span class="line">kubectl delete pod nginx -n dev</span><br><span class="line">kubectl delete ns dev</span><br></pre></td></tr></table></figure>
+
+<h2 id="命令式对象配置"><a href="#命令式对象配置" class="headerlink" title="命令式对象配置"></a>命令式对象配置</h2><blockquote>
+<p>通过命令配置和配置文件去操作kubernetes的资源<br>命令式对象配置的方式操作资源，可以简单的认为：命令+yaml配置文件（里面是命令需要的各种参数）</p>
+</blockquote>
+<p>新建一个 nginxpod.yaml 文件，内容如下：</p>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Namespace</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">dev</span></span><br><span class="line"><span class="meta">---</span></span><br><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">nginxpod</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx-containers</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span></span><br></pre></td></tr></table></figure>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">创建</span></span><br><span class="line">kubectl create -f nginxpod.yaml</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看</span></span><br><span class="line">kubectl get -f nginxpod.yaml</span><br><span class="line"><span class="meta prompt_"></span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">删除</span></span><br><span class="line">kubectl delete -f nginxpod.yaml</span><br></pre></td></tr></table></figure>
+
+<h2 id="声明式对象配置"><a href="#声明式对象配置" class="headerlink" title="声明式对象配置"></a>声明式对象配置</h2><blockquote>
+<p>通过apply命令和配置文件去操作kubernetes的资源。<br>声明式对象配置和命令式对象配置类似，只不过它只有一个apply命令。<br>apply相当于create和patch。<br>声明式对象配置就是使用apply描述一个资源的最终状态（在yaml中定义状态）</p>
+</blockquote>
+<p>我们继续使用上面 nginxpod.yaml</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f nginxpod.yaml</span><br></pre></td></tr></table></figure>
+
+<h2 id="使用方式推荐"><a href="#使用方式推荐" class="headerlink" title="使用方式推荐"></a>使用方式推荐</h2><ul>
+<li>创建和更新资源使用声明式对象配置：kubectl apply -f xxx.yaml。 </li>
+<li>删除资源使用命令式对象配置：kubectl delete -f xxx.yaml。 </li>
+<li>查询资源使用命令式对象管理：kubectl get(describe) 资源名称。</li>
+</ul>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                </ul>
+            
+        </div>
+        
+    <div id='gitalk-container' class="comment link"
+		data-enable='true'
+        data-ae='true'
+        data-ci='aae5f1ef39ad91ac18d0'
+        data-cs='9bdc46e39856d885ab0ccb5de3ef37351d543ec1'
+        data-r='blog.github.io'
+        data-o='bob-zou'
+        data-a='bob-zou'
+        data-d='false'
+    >查看评论</div>
+
+
+    </div>
+    
+</div>
+
+
+    </div>
+    <center>
+        <p class="footerlinks">
+            <a href="#" class="iconfont icon-null"></a>
+            
+                <a href="https://github.com/bob-zou" title="github" class="iconfont icon-github" target="_blank" rel="noopener"> </a>
+            
+                <a href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/wechat.jpg" title="wechat" class="iconfont icon-wechat" target="_blank" rel="noopener"> </a>
+            
+                <a href="mailto:zyp19901009@163.com" title="email" class="iconfont icon-email" target="_blank" rel="noopener"> </a>
+            
+            <a href="#" class="iconfont icon-null"></a>
+        </p>
+
+        <p id="copyright">
+            &copy; 2023 Bob Zou 书山有路勤为径，学海无涯苦作舟
+        </p>
+    </center>
+</div>
+
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MTN9237PJK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-MTN9237PJK');
+</script>
+<!-- End Google Analytics -->
+
+
+</html>

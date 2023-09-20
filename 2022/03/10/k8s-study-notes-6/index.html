@@ -1,0 +1,277 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN,en,default" class="loading">
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+    <meta name="viewport" content="width=device-width, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>K8S学习笔记（六）- K8S Pod详解 - Pod的配置 - 书山有路勤为径，学海无涯苦作舟</title>
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="google" content="notranslate" />
+    <meta name="keywords" content="BobZou,"> 
+    <meta name="description" content="概述
+本小节主要来研究pod.spec.containers属性，这也是Pod配置中最为关键的一项配置
+
+12# 查看pod.spec.containers的可选配置项kubectl explain,"> 
+    <meta name="author" content="Bob Zou"> 
+    <link rel="alternative" href="atom.xml" title="书山有路勤为径，学海无涯苦作舟" type="application/atom+xml"> 
+    <link rel="icon" href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/favicon.png"> 
+    
+<link rel="stylesheet" href="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.css">
+
+    
+<link rel="stylesheet" href="/css/bootstrap.css">
+
+    
+<link rel="stylesheet" href="/css/diaspora.css">
+
+<meta name="generator" content="Hexo 5.4.2"></head>
+
+<body class="loading">
+    <span id="config-title" style="display:none">书山有路勤为径，学海无涯苦作舟</span>
+    <div id="loader"></div>
+    <div id="single">
+    <div id="top" style="display: block;">
+    <div class="bar" style="width: 0;"></div>
+    <a class="iconfont icon-home image-icon" href="javascript:;" data-url="https://blog.zouyapeng.com"></a>
+    <div title="播放/暂停" class="iconfont icon-play"></div>
+    <h3 class="subtitle">K8S学习笔记（六）- K8S Pod详解 - Pod的配置</h3>
+    <div class="social">
+        <div>
+            <div class="share">
+                <a title="获取二维码" class="iconfont icon-scan" href="javascript:;"></a>
+            </div>
+            <div id="qr"></div>
+        </div>
+    </div>
+    <div class="scrollbar"></div>
+</div>
+
+    <div class="section">
+        <div class="article">
+    <div class='main'>
+        <h1 class="title">K8S学习笔记（六）- K8S Pod详解 - Pod的配置</h1>
+        <div class="stuff">
+            <span>三月 10, 2022</span>
+            
+  <ul class="post-tags-list" itemprop="keywords"><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/docker/" rel="tag">docker</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/k8s/" rel="tag">k8s</a></li><li class="post-tags-list-item"><a class="post-tags-list-link" href="/tags/kubernetes/" rel="tag">kubernetes</a></li></ul>
+
+
+        </div>
+        <div class="content markdown">
+            <h2 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h2><blockquote>
+<p>本小节主要来研究pod.spec.containers属性，这也是Pod配置中最为关键的一项配置</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看pod.spec.containers的可选配置项</span></span><br><span class="line">kubectl explain pod.spec.containers</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">返回的重要属性</span></span><br><span class="line"><span class="meta prompt_"># </span><span class="language-bash">返回的重要属性</span></span><br><span class="line">KIND:    Pod</span><br><span class="line">VERSION: v1</span><br><span class="line">RESOURCE: containers &lt;[]Object&gt;  # 数组，代表可以有多个容器FIELDS:</span><br><span class="line">  name &lt;string&gt; # 容器名称</span><br><span class="line">  image &lt;string&gt; # 容器需要的镜像地址</span><br><span class="line">  imagePullPolicy &lt;string&gt; # 镜像拉取策略 </span><br><span class="line">  command &lt;[]string&gt; # 容器的启动命令列表，如不指定，使用打包时使用的启动命令</span><br><span class="line">  args  &lt;[]string&gt; # 容器的启动命令需要的参数列表 </span><br><span class="line">  env   &lt;[]Object&gt; # 容器环境变量的配置</span><br><span class="line">  ports  &lt;[]Object&gt;  # 容器需要暴露的端口号列表</span><br><span class="line">  resources &lt;Object&gt; # 资源限制和资源请求的设置</span><br></pre></td></tr></table></figure>
+
+<h2 id="基本配置"><a href="#基本配置" class="headerlink" title="基本配置"></a>基本配置</h2><h3 id="创建pod-base-yaml文件"><a href="#创建pod-base-yaml文件" class="headerlink" title="创建pod-base.yaml文件"></a>创建pod-base.yaml文件</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-base</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">busybox</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">busybox:1.30</span> <span class="comment"># 容器需要的镜像地址</span></span><br></pre></td></tr></table></figure>
+<p>上面定义了一个比较简单的Pod的配置，里面有两个容器：</p>
+<ul>
+<li>nginx：用的是1.17.1版本的nginx镜像创建（nginx是一个轻量级的web容器）。</li>
+<li>busybox：用的是1.30版本的busybox镜像创建（busybox是一个小巧的linux命令集合）</li>
+</ul>
+<h3 id="创建POD"><a href="#创建POD" class="headerlink" title="创建POD"></a>创建POD</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f pod-base.yaml</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看POD</span></span><br><span class="line">kubectl get pod pod-base -n dev</span><br><span class="line"></span><br><span class="line">kubectl describe pod pod-base -n dev</span><br></pre></td></tr></table></figure>
+<p><img src="1.png" alt="1"></p>
+<ul>
+<li>1/2: 表示2个容器1个就绪，一个未就绪</li>
+<li>RESTARTS：表示容器重启的次数</li>
+</ul>
+<h2 id="镜像拉取策略"><a href="#镜像拉取策略" class="headerlink" title="镜像拉取策略"></a>镜像拉取策略</h2><h3 id="创建pod-imagepullpolicy-yaml"><a href="#创建pod-imagepullpolicy-yaml" class="headerlink" title="创建pod-imagepullpolicy.yaml"></a>创建pod-imagepullpolicy.yaml</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-imagepullpolicy</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">imagePullPolicy:</span> <span class="string">Always</span> <span class="comment"># 用于设置镜像的拉取策略</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">busybox</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">busybox:1.30</span> <span class="comment"># 容器需要的镜像地址</span></span><br></pre></td></tr></table></figure>
+<p>imagePullPolicy: 用于设置镜像拉取的策略，kubernetes支持配置三种拉取策略</p>
+<blockquote>
+<p>如果镜像tag为具体的版本号，默认策略是IfNotPresent。<br>如果镜像tag为latest（最终版本），默认策略是Always</p>
+</blockquote>
+<ul>
+<li>Always：总是从远程仓库拉取镜像（一直远程下载）。 </li>
+<li>IfNotPresent：本地有则使用本地镜像，本地没有则从远程仓库拉取镜像（本地有就用本地，本地没有就使用远程下载）。 </li>
+<li>Never：只使用本地镜像，从不去远程仓库拉取，本地没有就报错（一直使用本地，没有就报错）。</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f pod-imagepullpolicy.yaml</span><br><span class="line"></span><br><span class="line">kubectl describe pod pod-imagepullpolicy -n dev</span><br></pre></td></tr></table></figure>
+
+<h2 id="启动命令"><a href="#启动命令" class="headerlink" title="启动命令"></a>启动命令</h2><blockquote>
+<p>在前面的案例中，一直有一个问题没有解决，就是busybox容器一直没有成功运行，那么到底是什么原因导致这个容器的故障的呢？<br>原来busybox并不是一个程序，而是类似于一个工具类的集合，kubernetes集群启动管理后，它会自动关闭。解决方法就是让其一直在运行，这就用到了command的配置。</p>
+</blockquote>
+<h3 id="创建pod-command-yaml文件"><a href="#创建pod-command-yaml文件" class="headerlink" title="创建pod-command.yaml文件"></a>创建pod-command.yaml文件</h3><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-command</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">imagePullPolicy:</span> <span class="string">IfNotPresent</span> <span class="comment"># 设置镜像拉取策略</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">busybox</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">busybox:1.30</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">command:</span> [<span class="string">&quot;/bin/sh&quot;</span>,<span class="string">&quot;-c&quot;</span>,<span class="string">&quot;touch /tmp/hello.txt;while true;do /bin/echo $(date +%T) &gt;&gt; /tmp/hello.txt;sleep 3;done;&quot;</span>]</span><br></pre></td></tr></table></figure>
+<blockquote>
+<p>command：用于在Pod中的容器初始化完毕之后执行一个命令。 这里稍微解释下command中的命令的意思：</p>
+</blockquote>
+<ul>
+<li>“/bin/sh”,”-c”：使用sh执行命令。</li>
+<li>touch /tmp/hello.txt：创建一个/tmp/hello.txt的文件。</li>
+<li>while true;do /bin/echo $(date +%T) &gt;&gt; /tmp/hello.txt;sleep 3;done：每隔3秒，向文件写入当前时间</li>
+</ul>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">kubectl apply -f pod-command.yaml</span><br><span class="line"></span><br><span class="line">kubectl get pod pod-command -n dev</span><br><span class="line">kubectl describe pod pod-command -n dev</span><br></pre></td></tr></table></figure>
+
+<h3 id="进入容器"><a href="#进入容器" class="headerlink" title="进入容器"></a>进入容器</h3><figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">kubectl exec -it pod-command -n dev /bin/sh</span><br><span class="line">kubectl exec -it pod-command -n dev -c nginx /bin/sh</span><br><span class="line">kubectl exec -it pod-command -n dev -c busybox /bin/sh</span><br></pre></td></tr></table></figure>
+
+<h3 id="特别说明"><a href="#特别说明" class="headerlink" title="特别说明"></a>特别说明</h3><blockquote>
+<p>通过上面发现command已经可以完成启动命令和传递参数的功能，为什么还要提供一个args选项，用于传递参数？<br>其实和Docker有点关系，kubernetes中的command和args两个参数其实是为了实现覆盖Dockerfile中的ENTRYPOINT的功能：</p>
+</blockquote>
+<ul>
+<li>如果command和args均没有写，那么用Dockerfile的配置</li>
+<li>如果command写了，但是args没有写，那么Dockerfile默认的配置会被忽略，执行注入的command。</li>
+<li>如果command没有写，但是args写了，那么Dockerfile中配置的ENTRYPOINT命令会被执行，使用当前args的参数。</li>
+<li>如果command和args都写了，那么Dockerfile中的配置会被忽略，执行command并追加上args参数。</li>
+</ul>
+<h2 id="环境变量（不推荐）"><a href="#环境变量（不推荐）" class="headerlink" title="环境变量（不推荐）"></a>环境变量（不推荐）</h2><figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-env</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">imagePullPolicy:</span> <span class="string">IfNotPresent</span> <span class="comment"># 设置镜像拉取策略</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">busybox</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">busybox:1.30</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">command:</span> [<span class="string">&quot;/bin/sh&quot;</span>,<span class="string">&quot;-c&quot;</span>,<span class="string">&quot;touch /tmp/hello.txt;while true;do /bin/echo $(date +%T) &gt;&gt; /tmp/hello.txt;sleep 3;done;&quot;</span>]</span><br><span class="line">      <span class="attr">env:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">&quot;username&quot;</span></span><br><span class="line">          <span class="attr">value:</span> <span class="string">&quot;admin&quot;</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">&quot;password&quot;</span></span><br><span class="line">          <span class="attr">value:</span> <span class="string">&quot;123456&quot;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="端口设置"><a href="#端口设置" class="headerlink" title="端口设置"></a>端口设置</h2><blockquote>
+<p>访问Pod中的容器中的程序使用的是PodIp:containerPort。</p>
+</blockquote>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">查看ports支持的子选项</span></span><br><span class="line">kubectl explain pod.spec.containers.ports</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">KIND:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">VERSION:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">RESOURCE:</span> <span class="string">ports</span> <span class="string">&lt;[]Object&gt;</span></span><br><span class="line"><span class="attr">FIELDS:</span></span><br><span class="line">  <span class="string">name</span> <span class="string">&lt;string&gt;</span> <span class="comment"># 端口名称，如果指定，必须保证name在pod中是唯一的</span></span><br><span class="line">  <span class="string">containerPort</span> <span class="string">&lt;integer&gt;</span> <span class="comment"># 容器要监听的端口(0&lt;x&lt;65536)</span></span><br><span class="line">  <span class="string">hostPort</span> <span class="string">&lt;integer&gt;</span> <span class="comment"># 容器要在主机上公开的端口，如果设置，主机上只能运行容器的一个副本(一般省略）</span></span><br><span class="line">  <span class="string">hostIP</span> <span class="string">&lt;string&gt;</span> <span class="comment"># 要将外部端口绑定到的主机IP(一般省略)</span></span><br><span class="line">  <span class="string">protocol</span> <span class="string">&lt;string&gt;</span> <span class="comment"># 端口协议。必须是UDP、TCP或SCTP。默认为“TCP”</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-ports</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">imagePullPolicy:</span> <span class="string">IfNotPresent</span> <span class="comment"># 设置镜像拉取策略</span></span><br><span class="line">      <span class="attr">ports:</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx-port</span> <span class="comment"># 端口名称，如果执行，必须保证name在Pod中是唯一的</span></span><br><span class="line">          <span class="attr">containerPort:</span> <span class="number">80</span> <span class="comment"># 容器要监听的端口 （0~65536）</span></span><br><span class="line">          <span class="attr">protocol:</span> <span class="string">TCP</span> <span class="comment"># 端口协议</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="资源配额"><a href="#资源配额" class="headerlink" title="资源配额"></a>资源配额</h2><blockquote>
+<p>器中的程序要运行，肯定会占用一定的资源，比如CPU和内存等，如果不对某个容器的资源做限制，那么它就可能吃掉大量的资源，导致其他的容器无法运行。<br>针对这种情况，kubernetes提供了对内存和CPU的资源进行配额的机制，这种机制主要通过resources选项实现，它有两个子选项</p>
+</blockquote>
+<ul>
+<li>limits：用于限制运行的容器的最大占用资源，当容器占用资源超过limits时会被终止，并进行重启</li>
+<li>requests：用于设置容器需要的最小资源，如果环境资源不够，容器将无法启动</li>
+<li><h3 id="创建pod-resoures-yaml"><a href="#创建pod-resoures-yaml" class="headerlink" title="创建pod-resoures.yaml"></a>创建pod-resoures.yaml</h3><blockquote>
+<p>cpu：core数，可以为整数或小数。<br>memory：内存大小，可以使用Gi、Mi、G、M等形式。</p>
+</blockquote>
+<figure class="highlight yaml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line"><span class="attr">apiVersion:</span> <span class="string">v1</span></span><br><span class="line"><span class="attr">kind:</span> <span class="string">Pod</span></span><br><span class="line"><span class="attr">metadata:</span></span><br><span class="line">  <span class="attr">name:</span> <span class="string">pod-resoures</span></span><br><span class="line">  <span class="attr">namespace:</span> <span class="string">dev</span></span><br><span class="line"><span class="attr">spec:</span></span><br><span class="line">  <span class="attr">containers:</span></span><br><span class="line">    <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx</span> <span class="comment"># 容器名称</span></span><br><span class="line">      <span class="attr">image:</span> <span class="string">nginx:1.17.1</span> <span class="comment"># 容器需要的镜像地址</span></span><br><span class="line">      <span class="attr">imagePullPolicy:</span> <span class="string">IfNotPresent</span> <span class="comment"># 设置镜像拉取策略</span></span><br><span class="line">      <span class="attr">ports:</span> <span class="comment"># 端口设置</span></span><br><span class="line">        <span class="bullet">-</span> <span class="attr">name:</span> <span class="string">nginx-port</span> <span class="comment"># 端口名称，如果执行，必须保证name在Pod中是唯一的</span></span><br><span class="line">          <span class="attr">containerPort:</span> <span class="number">80</span> <span class="comment"># 容器要监听的端口 （0~65536）</span></span><br><span class="line">          <span class="attr">protocol:</span> <span class="string">TCP</span> <span class="comment"># 端口协议</span></span><br><span class="line">      <span class="attr">resources:</span> <span class="comment"># 资源配额</span></span><br><span class="line">        <span class="attr">limits:</span> <span class="comment"># 限制资源的上限</span></span><br><span class="line">          <span class="attr">cpu:</span> <span class="string">&quot;2&quot;</span> <span class="comment"># CPU限制，单位是core数</span></span><br><span class="line">          <span class="attr">memory:</span> <span class="string">&quot;10Gi&quot;</span> <span class="comment"># 内存限制</span></span><br><span class="line">        <span class="attr">requests:</span> <span class="comment"># 限制资源的下限</span></span><br><span class="line">          <span class="attr">cpu:</span> <span class="string">&quot;1&quot;</span> <span class="comment"># CPU限制，单位是core数 </span></span><br><span class="line">          <span class="attr">memory:</span> <span class="string">&quot;10Mi&quot;</span> <span class="comment"># 内存限制</span></span><br></pre></td></tr></table></figure>
+可以修改requests的 cpu 或 memory大小，让其大于node的最大值，之后就会发现pod启动失败。因为资源不够了</li>
+</ul>
+
+            <!--[if lt IE 9]><script>document.createElement('audio');</script><![endif]-->
+            <audio id="audio" loop="1" preload="auto" controls="controls" data-autoplay="false">
+                <source type="audio/mpeg" src="">
+            </audio>
+            
+                <ul id="audio-list" style="display:none">
+                    
+                </ul>
+            
+        </div>
+        
+    <div id='gitalk-container' class="comment link"
+		data-enable='true'
+        data-ae='true'
+        data-ci='aae5f1ef39ad91ac18d0'
+        data-cs='9bdc46e39856d885ab0ccb5de3ef37351d543ec1'
+        data-r='blog.github.io'
+        data-o='bob-zou'
+        data-a='bob-zou'
+        data-d='false'
+    >查看评论</div>
+
+
+    </div>
+    
+</div>
+
+
+    </div>
+    <center>
+        <p class="footerlinks">
+            <a href="#" class="iconfont icon-null"></a>
+            
+                <a href="https://github.com/bob-zou" title="github" class="iconfont icon-github" target="_blank" rel="noopener"> </a>
+            
+                <a href="https://cdn.jsdelivr.net/gh/bob-zou/blog.github.io/img/wechat.jpg" title="wechat" class="iconfont icon-wechat" target="_blank" rel="noopener"> </a>
+            
+                <a href="mailto:zyp19901009@163.com" title="email" class="iconfont icon-email" target="_blank" rel="noopener"> </a>
+            
+            <a href="#" class="iconfont icon-null"></a>
+        </p>
+
+        <p id="copyright">
+            &copy; 2023 Bob Zou 书山有路勤为径，学海无涯苦作舟
+        </p>
+    </center>
+</div>
+
+</body>
+
+<script src="//cdn.jsdelivr.net/npm/gitalk@1/dist/gitalk.min.js"></script>
+
+
+<script src="//lib.baomitu.com/jquery/1.8.3/jquery.min.js"></script>
+<script src="/js/plugin.js"></script>
+<script src="/js/typed.js"></script>
+<script src="/js/diaspora.js"></script>
+
+
+<link rel="stylesheet" href="/photoswipe/photoswipe.css">
+<link rel="stylesheet" href="/photoswipe/default-skin/default-skin.css">
+
+
+<script src="/photoswipe/photoswipe.min.js"></script>
+<script src="/photoswipe/photoswipe-ui-default.min.js"></script>
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <!--  Controls are self-explanatory. Order can be changed. -->
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                      <div class="pswp__preloader__cut">
+                        <div class="pswp__preloader__donut"></div>
+                      </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div> 
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+
+
+<!-- Google Analytics -->
+<!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-MTN9237PJK"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-MTN9237PJK');
+</script>
+<!-- End Google Analytics -->
+
+
+</html>
